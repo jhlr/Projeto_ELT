@@ -5,16 +5,23 @@ brasilio_url = 'https://brasil.io/api/v1/dataset/'
 slug = 'gastos-diretos/gastos/data/'
 brasilio_apikey = '________________________________________'
 
-file_gastos_parquet = './dataset/bronze'
-file_gastos_csv = './dataset/raw/gastos-diretos.csv.xz'
+gastos_parquet = './dataset/bronze'
+# tambem baixei o arquivo csv completo para simplificar
+gastos_csv = './dataset/raw/gastos-diretos.csv.xz'
+def gastos_json(page: int):
+	if page >= 1:
+		return f'./dataset/raw/gastos{ page }.json'
 
-def file_gastos_json(page: int = 1):
-	return f'./dataset/raw/gastos{ page }.json'
+def main():
+	n = 1000
+	for p in range(1, n+1):
+		extract_json(p)
+	bronze(n)
 
-def extract_json(page: int = 1):
+def extract_json(page: int):
 	if not (page >= 1):
 		return None
-	elif os.path.exists(file_gastos_json(page)):
+	elif os.path.exists(gastos_json(page)):
 		return False
 
 	url = brasilio_url + slug
@@ -28,23 +35,24 @@ def extract_json(page: int = 1):
 		return None
 
 	data = data['results']
-	with open(file_gastos_json(page), 'w', encoding = 'utf-8') as file:
+	with open(gastos_json(page), 'w', encoding = 'utf-8') as file:
 		json.dump(data, file, indent = 4)
 	return True
 
 
-def bronze(page: int):
-	if page >= 1:
-		with open(file_gastos_json(page), 'r') as file:
-			gastos = json.load(file)
+def bronze(npages: int):
+	dframe = None
+	if npages >= 1:
+		gastos = []
+		for p in range(1, npages+1):
+			with open(gastos_json(p), 'r') as file:
+				gastos.extend(json.load(file))
 		dframe = pandas.DataFrame(gastos)
 	else:
-		dframe = pandas.read_csv(file_gastos_csv)
-	dframe.to_parquet(file_gastos_parquet,
-		engine = 'pyarrow',  index = True,
+		dframe = pandas.read_csv(gastos_csv)
+	dframe.to_parquet(gastos_parquet,
+		engine = 'pyarrow', index = True,
 		partition_cols = [ 'ano', 'mes' ],
 	)
 
-if extract_json(1):
-	bronze(1)
-
+if __name__ == "__main__": main()
